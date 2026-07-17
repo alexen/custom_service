@@ -123,13 +123,27 @@ void runServerOnPort( std::uint16_t port )
                << ntohs(client_addr.sin_port) << std::endl;
 
           static char buffer[ 2048u ];
+          static char reversed[ sizeof( buffer ) ];
 
           // Читаем данные от клиента
           const auto bytes = recv( client_fd, buffer, sizeof( buffer ) - 1, 0 );
           if( bytes > 0 )
           {
-              buffer[ bytes ] = '\0';
-              std::cout << "Data received: " << buffer << '\n';
+               std::cout
+                    << "Recv[" << bytes << "]: " << std::string_view( buffer, bytes )
+                    << '\n';
+
+               std::copy(
+                    std::make_reverse_iterator( buffer + bytes ),
+                    std::make_reverse_iterator( buffer ),
+                    reversed
+               );
+
+               const auto rv = send( client_fd, reversed, bytes, 0 );
+
+               std::cout
+                    << "Send[" << rv << "]: " << std::string_view( reversed, bytes )
+                    << '\n';
           }
           else if( bytes == 0 )
           {
