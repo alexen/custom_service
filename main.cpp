@@ -23,7 +23,7 @@ using namespace std::string_literals;
 void reportAppStarting( int argc, char** argv )
 {
      std::cout
-          << "Start application " << std::quoted( argv[ 0 ] ) << " (" << getpid() << ")"
+          << "Start application " << std::quoted( argv[ 0 ] ) << " (pid: " << getpid() << ")"
           << (argc > 1 ? " with args:\n" : " without args\n");
      for( auto i = 1; i < argc; ++i )
      {
@@ -179,7 +179,7 @@ int main( int argc, char** argv )
      }
      catch( const std::exception& e )
      {
-          std::cerr << "exception: " << e.what() << '\n';
+          std::cerr << "Exception: " << e.what() << '\n';
           return 1;
      }
      return 0;
