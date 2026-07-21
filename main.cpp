@@ -27,7 +27,7 @@ void reportAppStarting( int argc, char** argv )
           << (argc > 1 ? " with args:\n" : " without args\n");
      for( auto i = 1; i < argc; ++i )
      {
-          std::cout << std::setw( 4 ) << i << ") " << argv[ i ] << '\n';
+          std::cout << std::setw( 3 ) << i << ") " << argv[ i ] << '\n';
      }
 }
 
@@ -65,6 +65,8 @@ void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t han
 
 void runServerOnPort( std::uint16_t port )
 {
+     std::cout.setf( std::ios_base::unitbuf );
+
      std::cout << "Start listening port " << port << '\n';
 
      // 1. Создаём сокет (IPv4, TCP)
@@ -120,7 +122,7 @@ void runServerOnPort( std::uint16_t port )
           std::cout
                << "Client connected: "
                << inet_ntoa(client_addr.sin_addr) << ":"
-               << ntohs(client_addr.sin_port) << std::endl;
+               << ntohs(client_addr.sin_port) << '\n';
 
           static char buffer[ 2048u ];
           static char reversed[ sizeof( buffer ) ];
