@@ -3,5 +3,7 @@ set -eux
 
 # Перед удалением пакета отключаем сервис глобально
 if [ "$1" = "remove" ]; then
-  systemctl disable custom_service.service >& /dev/null || true
+  systemctl stop custom_service.service || true
+  systemctl disable custom_service.service || true
+  systemctl daemon-reload || true
 fi
