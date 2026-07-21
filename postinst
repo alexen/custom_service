@@ -3,7 +3,7 @@ set -eux
 
 # Если это обновление или чистая установка
 if [ "$1" = "configure" ]; then
-  systemctl daemon-reload >& /dev/null || true
-  systemctl enable custom_service.service >& /dev/null || true
-  systemctl restart custom_service.service >& /dev/null || true
+  systemctl daemon-reload || true
+  systemctl enable custom_service.service || true
+  systemctl restart custom_service.service || true
 fi
