@@ -7,7 +7,7 @@ case "$1" in
     systemctl daemon-reload || true
     systemctl --global enable custom_service.service || true
     if [ -n "$SUDO_USER" ]; then
-      systemctl --user --machine "$SUDO_USER@" restart custom_service.service
+      systemctl --user --machine "$SUDO_USER@" restart custom_service.service || true
     fi
     ;;
 esac
