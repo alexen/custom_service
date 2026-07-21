@@ -7,6 +7,7 @@ WorkingDirectory=@CMAKE_INSTALL_PREFIX@
 ExecStart=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ user=%u hostname=%H (boot=%b)
 Restart=on-failure
 StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target
