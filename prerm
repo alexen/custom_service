@@ -8,7 +8,7 @@ if [ "$1" = "remove" ]; then
     --echo \
     --ignore-case \
     --full \
-    '^/opt/.*/bin/custom_service.*'
+    '^/opt/.*/bin/custom_service.*' || true
   systemctl --global disable custom_service.service || true
   systemctl daemon-reload || true
 fi
