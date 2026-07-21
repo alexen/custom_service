@@ -4,7 +4,7 @@ Description=@PROJECT_DESCRIPTION@
 [Service]
 Type=simple
 WorkingDirectory=@CMAKE_INSTALL_PREFIX@
-ExecStart=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ user=%u@%H (boot=%b)
+ExecStart=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ user=%u hostname=%H (boot=%b)
 Restart=on-failure
 StandardOutput=journal
 
