@@ -1,9 +1,14 @@
 #!/bin/sh
 set -eux
 
-# Перед удалением пакета отключаем сервис глобально
 if [ "$1" = "remove" ]; then
-  systemctl stop custom_service.service || true
-  systemctl disable custom_service.service || true
+  # Останов пользовательского сервиса невозможно выполнить
+  # штатной командой systemctl, поэтому используем pkill
+  pkill \
+    --echo \
+    --ignore-case \
+    --full \
+    '^/opt/.*/bin/custom_service.*'
+  systemctl --global disable custom_service.service || true
   systemctl daemon-reload || true
 fi

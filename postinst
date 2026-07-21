@@ -1,9 +1,13 @@
 #!/bin/sh
 set -eux
 
-# Если это обновление или чистая установка
-if [ "$1" = "configure" ]; then
-  systemctl daemon-reload || true
-  systemctl enable custom_service.service || true
-  systemctl restart custom_service.service || true
-fi
+case "$1" in
+  # Если это обновление или чистая установка
+  configure|reconfigure)
+    systemctl daemon-reload || true
+    systemctl --global enable custom_service.service || true
+    if [ -n "$SUDO_USER" ]; then
+      systemctl --user --machine "$SUDO_USER@" restart custom_service.service
+    fi
+    ;;
+esac
