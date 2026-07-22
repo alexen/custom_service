@@ -1,15 +1,10 @@
 #!/bin/sh
 set -eux
 
-case "$1" in
-  # Если это обновление или чистая установка
-  configure|reconfigure)
-    systemctl daemon-reload || true
-    systemctl --global enable custom_service.service || true
-    if [ -n "$SUDO_USER" ]; then
-      if [ "$(loginctl show-user $SUDO_USER -p Linger)" != "Linger=no" ]; then
-        systemctl --user --machine "$SUDO_USER@" restart custom_service.service || true
-      fi
-    fi
-    ;;
-esac
+systemctl daemon-reload || true
+systemctl --global enable custom_service.service || true
+if [ -n "$SUDO_USER" ]; then
+  if [ "$(loginctl show-user $SUDO_USER -p Linger)" != "Linger=no" ]; then
+    systemctl --user --machine "$SUDO_USER@" restart custom_service.service || true
+  fi
+fi
