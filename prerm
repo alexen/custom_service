@@ -1,14 +1,12 @@
 #!/bin/sh
 set -eux
 
-if [ "$1" = "remove" ]; then
-  # Останов пользовательского сервиса невозможно выполнить
-  # штатной командой systemctl, поэтому используем pkill
-  pkill \
-    --echo \
-    --ignore-case \
-    --full \
-    '^/opt/.*/bin/custom_service.*' || true
-  systemctl --global disable custom_service.service || true
-  systemctl daemon-reload || true
-fi
+# Останов пользовательского сервиса невозможно выполнить
+# штатной командой systemctl, поэтому используем pkill
+pkill \
+  --echo \
+  --ignore-case \
+  --full \
+  '^/opt/.*/bin/custom_service.*' || true
+systemctl --global disable custom_service.service || true
+systemctl daemon-reload || true
