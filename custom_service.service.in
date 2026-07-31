@@ -1,11 +1,14 @@
 [Unit]
 Description=@PROJECT_DESCRIPTION@
+StartLimitBurst=5
+ConditionPathIsDirectory=/home/%u
 
 [Service]
 Type=simple
 WorkingDirectory=@CMAKE_INSTALL_PREFIX@
-ExecStart=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ user=%u hostname=%H (boot=%b)
+ExecStart=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ user=%u hostname=%H homedir=%h (boot=%b)
 Restart=on-failure
+RestartSec=3
 StandardOutput=journal
 StandardError=journal
 

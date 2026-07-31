@@ -40,7 +40,7 @@ install(TARGETS custom_service
 
 # Правила формирования и установки unit-файла сервиса
 #
-set(SERVICE_UNIT_INSTALL_PREFIX "/usr/lib/systemd/system")
+set(SERVICE_UNIT_INSTALL_PREFIX "/usr/lib/systemd/user")
 set(SERVICE_UNIT_FILE_TEMPLATE custom_service.service.in)
 set(SERVICE_UNIT_OUTPUT_FILE "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.service")
 

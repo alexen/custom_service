@@ -23,7 +23,7 @@ using namespace std::string_literals;
 void reportAppStarting( int argc, char** argv )
 {
      std::cout
-          << "Start application " << std::quoted( argv[ 0 ] ) << " (" << getpid() << ")"
+          << "Start application " << std::quoted( argv[ 0 ] ) << " (pid: " << getpid() << ")"
           << (argc > 1 ? " with args:\n" : " without args\n");
      for( auto i = 1; i < argc; ++i )
      {
@@ -76,7 +76,13 @@ void runServerOnPort( std::uint16_t port )
           THROW_POSIX_ERROR( "socket()" );
      }
 
-     std::shared_ptr< const int > srvFdGrd{ &server_fd, []( auto fd ){ close( *fd ); } };
+     std::shared_ptr< const int > srvFd{
+          &server_fd,
+          []( auto fd ){
+               std::cout << "Close server socket descriptor: " << *fd << '\n';
+               close( *fd );
+          }
+     };
 
      // 1.1. Опционально: разрешить повторное использование адреса (удобно при перезапуске)
      int opt = 1;
@@ -117,7 +123,13 @@ void runServerOnPort( std::uint16_t port )
                THROW_POSIX_ERROR( "accept()" );
           }
 
-          std::shared_ptr< const int > clnFd{ &client_fd, []( auto fd ){ close( *fd ); } };
+          std::shared_ptr< const int > clnFd{
+               &client_fd,
+               []( auto fd ){
+                    std::cout << "Close client socket descriptor: " << *fd << '\n';
+                    close( *fd );
+               }
+          };
 
           std::cout
                << "Client connected: "
@@ -179,7 +191,7 @@ int main( int argc, char** argv )
      }
      catch( const std::exception& e )
      {
-          std::cerr << "exception: " << e.what() << '\n';
+          std::cerr << "Exception: " << e.what() << '\n';
           return 1;
      }
      return 0;
