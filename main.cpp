@@ -173,9 +173,8 @@ void runServerOnPort( std::uint16_t port )
 
 void signalHandler( int signum )
 {
-     std::cout << "Caught signal " << SigNum{ signum } << "!\n";
-     signal( signum, SIG_DFL );
-     raise( signum );
+     std::cout << "Caught signal " << SigNum{ signum } << ": successfully quit!\n";
+     exit( EXIT_SUCCESS );
 }
 
 
