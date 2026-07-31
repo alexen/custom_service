@@ -1,9 +1,5 @@
 #!/bin/sh
 set -eux
 
-# Если это обновление или чистая установка
-if [ "$1" = "configure" ]; then
-  systemctl daemon-reload || true
-  systemctl enable custom_service.service || true
-  systemctl restart custom_service.service || true
-fi
+systemctl daemon-reload || true
+systemctl --global enable custom_service.service || true
