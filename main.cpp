@@ -1,20 +1,21 @@
 /// getpid()
 #include <unistd.h>
+#include <signal.h>
 
 /// POSIX Network
 #include <errno.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <linux/netlink.h>
+#include <linux/sock_diag.h>
+#include <linux/inet_diag.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <cstring>
-#include <csignal>
-#include <iostream>
-#include <iomanip>
-#include <functional>
-#include <thread>
-#include <chrono>
-#include <memory>
+#include <cstdint>
+
+#include <boost/log/trivial.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 
 
 using namespace std::string_literals;
@@ -22,12 +23,12 @@ using namespace std::string_literals;
 
 void reportAppStarting( int argc, char** argv )
 {
-     std::cout
+     BOOST_LOG_TRIVIAL( info )
           << "Start application " << std::quoted( argv[ 0 ] ) << " (pid: " << getpid() << ")"
-          << (argc > 1 ? " with args:\n" : " without args\n");
+          << (argc > 1 ? " with args:" : " without args");
      for( auto i = 1; i < argc; ++i )
      {
-          std::cout << std::setw( 3 ) << i << ") " << argv[ i ] << '\n';
+          BOOST_LOG_TRIVIAL( info ) << std::setw( 3 ) << i << ") " << argv[ i ];
      }
 }
 
@@ -48,7 +49,7 @@ void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t han
 {
      for( auto&& signum: signums )
      {
-          std::cout << "Set handler for signal " << SigNum{ signum } << '\n';
+          BOOST_LOG_TRIVIAL( info ) << "Set handler for signal " << SigNum{ signum };
           signal( signum, handler );
      }
 }
@@ -62,12 +63,176 @@ void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t han
      } while( false )
 
 
+// Функция запрашивает UID владельца TCP-сокета напрямую у ядра Linux через Netlink
+uid_t getTcpSocketUserId( int socketFd )
+{
+     BOOST_LOG_TRIVIAL( trace ) << "[TRACE] >>> STARTING BI-DIRECTIONAL NETLINK DIAGNOSTIC SCAN <<<";
+
+     struct sockaddr_storage localAddr {};
+     struct sockaddr_storage remoteAddr {};
+
+     socklen_t localAddrLen = sizeof( localAddr );
+     socklen_t remoteAddrLen = sizeof( remoteAddr );
+
+     if( getsockname( socketFd, (struct sockaddr*) &localAddr, &localAddrLen ) < 0
+          || getpeername( socketFd, (struct sockaddr*) &remoteAddr, &remoteAddrLen ) < 0 )
+     {
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] FAILED: getsockname or getpeername failed: " << strerror( errno );
+          return -1;
+     }
+
+     std::uint16_t localPort {};
+     std::uint16_t remotePort {};
+
+     const auto queryFamily = localAddr.ss_family;
+
+     if( queryFamily == AF_INET )
+     {
+          localPort = ntohs( ( (struct sockaddr_in*) &localAddr )->sin_port );
+          remotePort = ntohs( ( (struct sockaddr_in*) &remoteAddr )->sin_port );
+     }
+     else if( queryFamily == AF_INET6 )
+     {
+          localPort = ntohs( ( (struct sockaddr_in6*) &localAddr )->sin6_port );
+          remotePort = ntohs( ( (struct sockaddr_in6*) &remoteAddr )->sin6_port );
+     }
+
+     BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Connection data from Boost stream:";
+     BOOST_LOG_TRIVIAL( trace ) << "        Service Listening Port (Local): " << localPort;
+     BOOST_LOG_TRIVIAL( trace ) << "        Incoming Client Port (Remote):  " << remotePort;
+
+     const auto netlinkFd = socket( AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG );
+     if( netlinkFd < 0 )
+     {
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] FAILED: socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG) failed: "
+               << strerror( errno );
+          return -1;
+     }
+
+     struct timeval tv {};
+     tv.tv_sec = 0;
+     tv.tv_usec = 500000; // 500мс таймаут
+     if( setsockopt( netlinkFd, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof( tv ) ) < 0 )
+     {
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] FAILED: setsockopt(netlinkFd, SOL_SOCKET, SO_RCVTIMEO) failed: "
+               << strerror( errno );
+          close( netlinkFd );
+          return -1;
+     }
+
+     struct
+     {
+          struct nlmsghdr nlh {};
+          struct inet_diag_req_v2 req {};
+     }
+     request {};
+
+     request.nlh.nlmsg_len = sizeof( request );
+     request.nlh.nlmsg_type = SOCK_DIAG_BY_FAMILY;          /// Тип запроса для sock_diag
+     request.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;  /// Дампим таблицу для фильтрации
+
+     request.req.sdiag_family = queryFamily;      /// Ищем IPv4 или IPv6 сокеты
+     request.req.sdiag_protocol = IPPROTO_TCP;    /// Ищем TCP сокеты
+     request.req.idiag_states = 0xFFFFFFFF;       /// Все состояния сокетов
+
+     if( send( netlinkFd, &request, sizeof( request ), 0 ) < 0 )
+     {
+          BOOST_LOG_TRIVIAL( trace ) << "[TRACE] FAILED: send failed: " << strerror( errno );
+          close( netlinkFd );
+          return -1;
+     }
+
+     /// Выделяем 128КБ под системную таблицу ядра Linux
+     std::vector< char > buffer( 128u * 1024u );
+     uid_t verifiedClientUid = -1;
+     bool scanComplete = false;
+     int inspectedRowsCount = 0;
+
+     while( !scanComplete )
+     {
+          auto nBytes = recv( netlinkFd, buffer.data(), buffer.size(), 0 );
+          if( nBytes <= 0 )
+          {
+               BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Kernel stream ended or timed out.";
+               break;
+          }
+
+          for( auto nlh = (struct nlmsghdr*) buffer.data();
+               NLMSG_OK( nlh, nBytes );
+               nlh = NLMSG_NEXT( nlh, nBytes ) )
+          {
+               if( nlh->nlmsg_type == NLMSG_DONE
+                   || nlh->nlmsg_type == NLMSG_ERROR )
+               {
+                    scanComplete = true;
+                    break;
+               }
+
+               if( nlh->nlmsg_type == SOCK_DIAG_BY_FAMILY )
+               {
+                    auto diagMsg = (struct inet_diag_msg*) NLMSG_DATA( nlh );
+
+                    auto kernelRowSport = ntohs( diagMsg->id.idiag_sport );
+                    auto kernelRowDport = ntohs( diagMsg->id.idiag_dport );
+                    auto kernelRowUid = diagMsg->idiag_uid;
+
+                    inspectedRowsCount++;
+
+                    if( kernelRowSport == localPort
+                         || kernelRowDport == localPort )
+                    {
+                         BOOST_LOG_TRIVIAL( trace )
+                              << "        -> [ROW MATCH #" << inspectedRowsCount
+                              << "]"
+                              << " Kernel_Source_Port: " << kernelRowSport
+                              << " | Kernel_Dest_Port: " << kernelRowDport
+                              << " | Row_Owner_UID: " << kernelRowUid;
+                    }
+
+                    if( kernelRowSport == remotePort
+                         && kernelRowDport == localPort )
+                    {
+                         verifiedClientUid = kernelRowUid;
+                         BOOST_LOG_TRIVIAL( trace ) << "           >>> TARGET CLIENT SOCKET DETECTED! <<<";
+                         BOOST_LOG_TRIVIAL( trace ) << "               Validated Browser Process UID: " << verifiedClientUid;
+                         scanComplete = true;
+                         break;
+                    }
+               }
+          }
+     }
+
+     close( netlinkFd );
+     return verifiedClientUid;
+}
+
+
+bool isConnectionAllowed( const int clientSockedFd )
+{
+     const auto clientUid = getTcpSocketUserId( clientSockedFd );
+     if( clientUid == static_cast< uid_t >( -1 ) )
+     {
+          BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Netlink query failed to extract UID!";
+          return false;
+     }
+
+     const auto currentUid = getuid();
+
+     BOOST_LOG_TRIVIAL( trace )
+          << "[TRACE] Comparing client UID " << clientUid
+          << " with service UID " << currentUid;
+
+     // Если UID совпали — это гарантированно один и тот же пользователь ОС
+     return clientUid == currentUid;
+}
+
 
 void runServerOnPort( std::uint16_t port )
 {
-     std::cout.setf( std::ios_base::unitbuf );
-
-     std::cout << "Start listening port " << port << '\n';
+     BOOST_LOG_TRIVIAL( info ) << "Start listening port " << port;
 
      // 1. Создаём сокет (IPv4, TCP)
      const int server_fd = socket( AF_INET, SOCK_STREAM, 0 );
@@ -115,10 +280,18 @@ void runServerOnPort( std::uint16_t port )
                THROW_POSIX_ERROR( "accept()" );
           }
 
-          std::cout
+          BOOST_LOG_TRIVIAL( info )
                << "Client connected: "
                << inet_ntoa(client_addr.sin_addr) << ":"
-               << ntohs(client_addr.sin_port) << '\n';
+               << ntohs(client_addr.sin_port);
+
+          if( !isConnectionAllowed( client_fd ) )
+          {
+               BOOST_LOG_TRIVIAL( info ) << "Connection is not allowed!";
+               shutdown( client_fd, SHUT_RD );
+               close( client_fd );
+               continue;
+          }
 
           static char buffer[ 2048u ];
           static char reversed[ sizeof( buffer ) ];
@@ -127,9 +300,8 @@ void runServerOnPort( std::uint16_t port )
           const auto bytes = recv( client_fd, buffer, sizeof( buffer ) - 1, 0 );
           if( bytes > 0 )
           {
-               std::cout
-                    << "Recv[" << bytes << "]: " << std::string_view( buffer, bytes )
-                    << '\n';
+               BOOST_LOG_TRIVIAL( info )
+                    << "Recv[" << bytes << "]: " << std::string_view( buffer, bytes );
 
                std::copy(
                     std::make_reverse_iterator( buffer + bytes ),
@@ -139,13 +311,12 @@ void runServerOnPort( std::uint16_t port )
 
                const auto rv = send( client_fd, reversed, bytes, 0 );
 
-               std::cout
-                    << "Send[" << rv << "]: " << std::string_view( reversed, bytes )
-                    << '\n';
+               BOOST_LOG_TRIVIAL( info )
+                    << "Send[" << rv << "]: " << std::string_view( reversed, bytes );
           }
           else if( bytes == 0 )
           {
-               std::cout << "Client disconnected!\n";
+               BOOST_LOG_TRIVIAL( info ) << "Client disconnected!";
           }
           else
           {
@@ -157,7 +328,7 @@ void runServerOnPort( std::uint16_t port )
 
 void signalHandler( int signum )
 {
-     std::cout << "Caught signal " << SigNum{ signum } << ": successfully quit!\n";
+     BOOST_LOG_TRIVIAL( info ) << "Caught signal " << SigNum{ signum } << ": successfully quit!";
      exit( EXIT_SUCCESS );
 }
 
@@ -172,9 +343,10 @@ int main( int argc, char** argv )
 
           runServerOnPort( 8080 );
      }
-     catch( const std::exception& e )
+     catch( ... )
      {
-          std::cerr << "Exception: " << e.what() << '\n';
+          BOOST_LOG_TRIVIAL( error )
+               << boost::current_exception_diagnostic_information();
           return 1;
      }
      return 0;
