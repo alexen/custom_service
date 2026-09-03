@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.15..3.31)
 
 project(
      custom_service
@@ -24,7 +24,7 @@ endif()
 
 
 find_package(Threads REQUIRED)
-find_package(Boost COMPONENTS log REQUIRED)
+find_package(Boost COMPONENTS log REQUIRED CONFIG)
 
 
 # Подключаем определение переменных с названиями системных
