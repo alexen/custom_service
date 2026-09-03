@@ -23,15 +23,8 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 
+find_package(Threads REQUIRED)
 find_package(Boost COMPONENTS log REQUIRED)
-
-set(REQUIRED_BOOST_HEADER "boost/exception/diagnostic_information.hpp")
-
-include(CheckIncludeFileCXX)
-check_include_file_cxx(${REQUIRED_BOOST_HEADER} HAS_DIAGNOSTIC_INFO)
-if(NOT HAS_DIAGNOSTIC_INFO)
-     message(FATAL_ERROR "Required Boost header 'boost/exception/diagnostic_information.hpp' is missing!")
-endif()
 
 
 # Подключаем определение переменных с названиями системных
@@ -43,10 +36,16 @@ include(GNUInstallDirs)
 # Правила сборки и инсталляции основного бинарника проекта
 #
 add_executable(custom_service main.cpp)
+target_compile_definitions(
+     custom_service
+     PRIVATE
+          BOOST_LOG_DYN_LINK
+)
 target_link_libraries(
      custom_service
      PRIVATE
           Boost::log
+          Threads::Threads
 )
 install(TARGETS custom_service
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
