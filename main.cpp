@@ -334,7 +334,11 @@ void runServerOnPort( std::uint16_t port )
           }
           else
           {
-              THROW_POSIX_ERROR( "recv()" );
+               if( errno == EINTR )
+               {
+                    continue;
+               }
+               THROW_POSIX_ERROR( "recv()" );
           }
      }
 
