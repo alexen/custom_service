@@ -1,8 +1,5 @@
-/// getpid()
 #include <unistd.h>
 #include <signal.h>
-
-/// POSIX Network
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -13,12 +10,22 @@
 #include <arpa/inet.h>
 
 #include <cstdint>
+#include <atomic>
 
 #include <boost/log/trivial.hpp>
 #include <boost/exception/diagnostic_information.hpp>
+#include <boost/throw_exception.hpp>
 
 
 using namespace std::string_literals;
+
+
+#define THROW_POSIX_ERROR( fn ) \
+     do { \
+          BOOST_THROW_EXCEPTION( std::runtime_error( \
+               std::string{ fn } + " failed: "s + strerror( errno ) \
+          ) ); \
+     } while( false )
 
 
 void reportAppStarting( int argc, char** argv )
@@ -47,20 +54,20 @@ std::ostream& operator<<( std::ostream& os, const SigNum& sn )
 
 void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t handler )
 {
+     /// ВАЖНО: флаг SA_RESTART отсутствует
+     struct sigaction sa {};
+     sa.sa_handler = handler;
+     sigemptyset( &sa.sa_mask );
+
      for( auto&& signum: signums )
      {
           BOOST_LOG_TRIVIAL( info ) << "Set handler for signal " << SigNum{ signum };
-          signal( signum, handler );
+          if( sigaction( signum, &sa, nullptr ) == -1 )
+          {
+               THROW_POSIX_ERROR( "sigaction" );
+          }
      }
 }
-
-
-#define THROW_POSIX_ERROR( fn ) \
-     do { \
-          throw std::runtime_error{ \
-               std::string{ fn } + " failed: "s + strerror( errno ) \
-          }; \
-     } while( false )
 
 
 // Функция запрашивает UID владельца TCP-сокета напрямую у ядра Linux через Netlink
@@ -230,6 +237,9 @@ bool isConnectionAllowed( const int clientSockedFd )
 }
 
 
+std::atomic_bool running = true;
+
+
 void runServerOnPort( std::uint16_t port )
 {
      BOOST_LOG_TRIVIAL( info ) << "Start listening port " << port;
@@ -269,7 +279,7 @@ void runServerOnPort( std::uint16_t port )
           THROW_POSIX_ERROR( "listen()" );
      }
 
-     while( true )
+     while( running )
      {
           sockaddr_in client_addr {};
           socklen_t client_len = sizeof( client_addr );
@@ -277,6 +287,10 @@ void runServerOnPort( std::uint16_t port )
           const auto client_fd = accept( server_fd, (sockaddr *) &client_addr, &client_len );
           if( client_fd == -1 )
           {
+               if( errno == EINTR )
+               {
+                    continue;
+               }
                THROW_POSIX_ERROR( "accept()" );
           }
 
@@ -323,13 +337,16 @@ void runServerOnPort( std::uint16_t port )
               THROW_POSIX_ERROR( "recv()" );
           }
      }
+
+     close( server_fd );
+     BOOST_LOG_TRIVIAL( info ) << "Gracefully shutdown server and exit!";
 }
 
 
 void signalHandler( int signum )
 {
-     BOOST_LOG_TRIVIAL( info ) << "Caught signal " << SigNum{ signum } << ": successfully quit!";
-     exit( EXIT_SUCCESS );
+     BOOST_LOG_TRIVIAL( debug ) << "Caught signal " << SigNum{ signum } << ": disable running flag!";
+     running = false;
 }
 
 
