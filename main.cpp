@@ -71,43 +71,10 @@ void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t han
 
 
 // Функция запрашивает UID владельца TCP-сокета напрямую у ядра Linux через Netlink
-uid_t getTcpSocketUserId( int socketFd )
+uid_t getTcpSocketUserId( std::uint16_t remotePort )
 {
      BOOST_LOG_TRIVIAL( trace ) << "[TRACE] >>> STARTING BI-DIRECTIONAL NETLINK DIAGNOSTIC SCAN <<<";
-
-     struct sockaddr_storage localAddr {};
-     struct sockaddr_storage remoteAddr {};
-
-     socklen_t localAddrLen = sizeof( localAddr );
-     socklen_t remoteAddrLen = sizeof( remoteAddr );
-
-     if( getsockname( socketFd, (struct sockaddr*) &localAddr, &localAddrLen ) < 0
-          || getpeername( socketFd, (struct sockaddr*) &remoteAddr, &remoteAddrLen ) < 0 )
-     {
-          BOOST_LOG_TRIVIAL( trace )
-               << "[TRACE] FAILED: getsockname or getpeername failed: " << strerror( errno );
-          return -1;
-     }
-
-     std::uint16_t localPort {};
-     std::uint16_t remotePort {};
-
-     const auto queryFamily = localAddr.ss_family;
-
-     if( queryFamily == AF_INET )
-     {
-          localPort = ntohs( ( (struct sockaddr_in*) &localAddr )->sin_port );
-          remotePort = ntohs( ( (struct sockaddr_in*) &remoteAddr )->sin_port );
-     }
-     else if( queryFamily == AF_INET6 )
-     {
-          localPort = ntohs( ( (struct sockaddr_in6*) &localAddr )->sin6_port );
-          remotePort = ntohs( ( (struct sockaddr_in6*) &remoteAddr )->sin6_port );
-     }
-
-     BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Connection data from Boost stream:";
-     BOOST_LOG_TRIVIAL( trace ) << "        Service Listening Port (Local): " << localPort;
-     BOOST_LOG_TRIVIAL( trace ) << "        Incoming Client Port (Remote):  " << remotePort;
+     BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Incoming Client Port (Remote): " << remotePort;
 
      const auto netlinkFd = socket( AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG );
      if( netlinkFd < 0 )
@@ -141,7 +108,7 @@ uid_t getTcpSocketUserId( int socketFd )
      request.nlh.nlmsg_type = SOCK_DIAG_BY_FAMILY;          /// Тип запроса для sock_diag
      request.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;  /// Дампим таблицу для фильтрации
 
-     request.req.sdiag_family = queryFamily;      /// Ищем IPv4 или IPv6 сокеты
+     request.req.sdiag_family = AF_INET;          /// Ищем IPv4
      request.req.sdiag_protocol = IPPROTO_TCP;    /// Ищем TCP сокеты
      request.req.idiag_states = 0xFFFFFFFF;       /// Все состояния сокетов
 
@@ -188,9 +155,14 @@ uid_t getTcpSocketUserId( int socketFd )
 
                     inspectedRowsCount++;
 
-                    if( kernelRowSport == localPort
-                         || kernelRowDport == localPort )
+                    /// Этот блок if оставляем здесь только для красивого
+                    /// и информативного TRACE-вывода
+                    if( kernelRowSport == remotePort
+                        || kernelRowDport == remotePort )
                     {
+                         verifiedClientUid = kernelRowUid;
+                         scanComplete = true;
+
                          BOOST_LOG_TRIVIAL( trace )
                               << "        -> [ROW MATCH #" << inspectedRowsCount
                               << "]"
@@ -199,12 +171,13 @@ uid_t getTcpSocketUserId( int socketFd )
                               << " | Row_Owner_UID: " << kernelRowUid;
                     }
 
-                    if( kernelRowSport == remotePort
-                         && kernelRowDport == localPort )
+                    if( kernelRowSport == remotePort )
                     {
                          verifiedClientUid = kernelRowUid;
+
                          BOOST_LOG_TRIVIAL( trace ) << "           >>> TARGET CLIENT SOCKET DETECTED! <<<";
                          BOOST_LOG_TRIVIAL( trace ) << "               Validated Browser Process UID: " << verifiedClientUid;
+
                          scanComplete = true;
                          break;
                     }
@@ -217,9 +190,9 @@ uid_t getTcpSocketUserId( int socketFd )
 }
 
 
-bool isConnectionAllowed( const int clientSockedFd )
+bool isConnectionAllowed( const std::uint16_t remotePort )
 {
-     const auto clientUid = getTcpSocketUserId( clientSockedFd );
+     const auto clientUid = getTcpSocketUserId( remotePort );
      if( clientUid == static_cast< uid_t >( -1 ) )
      {
           BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Netlink query failed to extract UID!";
@@ -294,12 +267,14 @@ void runServerOnPort( std::uint16_t port )
                THROW_POSIX_ERROR( "accept()" );
           }
 
+          const std::uint16_t remotePort = ntohs( client_addr.sin_port );
+
           BOOST_LOG_TRIVIAL( info )
                << "Client connected: "
-               << inet_ntoa(client_addr.sin_addr) << ":"
-               << ntohs(client_addr.sin_port);
+               << inet_ntoa( client_addr.sin_addr )
+               << ":" << remotePort;
 
-          if( !isConnectionAllowed( client_fd ) )
+          if( !isConnectionAllowed( remotePort ) )
           {
                BOOST_LOG_TRIVIAL( info ) << "Connection is not allowed!";
                shutdown( client_fd, SHUT_RD );
