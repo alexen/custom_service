@@ -90,10 +90,29 @@ configure_file("${CMAKE_CURRENT_LIST_DIR}/postrm.in"   "${CMAKE_BINARY_DIR}/post
 set(CPACK_PACKAGE_VENDOR "${PROJECT_AUTHOR_NAME}")
 set(CPACK_PACKAGE_CONTACT "${PROJECT_AUTHOR_EMAIL}")
 
+# Определяем тип целевого пакета по информации о системе
+#
+cmake_host_system_information(RESULT DISTRO QUERY DISTRIB_INFO)
+
+# В некоторых системах отсутствует переменная ID_LIKE, есть только переменная ID.
+# В связи с этим необходимо список DISTRO_ID_LIKE формировать из двух переменных.
+#
+string(REPLACE " " ";" DISTRO_ID_LIST "${DISTRO_ID_LIKE} ${DISTRO_ID}")
+
+if("debian" IN_LIST DISTRO_ID_LIST)
+     set(CPACK_GENERATOR "DEB")
+elseif("rhel" IN_LIST DISTRO_ID_LIST)
+     set(CPACK_GENERATOR "RPM")
+elseif("altlinux" IN_LIST DISTRO_ID_LIST)
+     set(CPACK_GENERATOR "RPM")
+else()
+     message(FATAL_ERROR "Unrecognized target OS: ${DISTRO_ID}")
+endif()
+
+message(STATUS "Installation package type: ${CPACK_GENERATOR}")
 
 # Минимальные настройки для формирования deb-пакета
 #
-set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_VENDOR} <${CPACK_PACKAGE_CONTACT}>")
 set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
