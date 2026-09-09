@@ -23,8 +23,13 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 
+if(POLICY CMP0167)
+     cmake_policy(SET CMP0167 OLD)
+endif()
+
+set(Boost_NO_BOOST_CMAKE ON)
+find_package(Boost COMPONENTS log REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Boost COMPONENTS log REQUIRED CONFIG)
 
 
 # Подключаем определение переменных с названиями системных
