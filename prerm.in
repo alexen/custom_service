@@ -2,6 +2,8 @@
 
 set -eux
 
+PRERM="============================================================================================"
+
 stop_service_for_all_active_users() {
   service_name_="$1"
   active_users_=$(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}' | while read -r U; do

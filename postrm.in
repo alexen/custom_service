@@ -2,6 +2,8 @@
 
 set -eux
 
+POSTRM="==========================================================================================="
+
 reload_daemon_for_all_active_users() {
   active_users_=$(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}' | while read -r U; do
       if getent passwd "$U" | cut -d: -f7 | grep -qf /etc/shells; then
