@@ -1,1 +1,1 @@
-boost-log-devel
+boost-log
