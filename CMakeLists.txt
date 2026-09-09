@@ -80,10 +80,16 @@ configure_file("${CMAKE_CURRENT_LIST_DIR}/postinst.in" "${CMAKE_BINARY_DIR}/post
 configure_file("${CMAKE_CURRENT_LIST_DIR}/prerm.in"    "${CMAKE_BINARY_DIR}/prerm"    @ONLY)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/postrm.in"   "${CMAKE_BINARY_DIR}/postrm"   @ONLY)
 
-# Минимальные настройки для формирования deb-пакета (пока только для Debian-систем)
+# Универсальные настройки для всех видов пакетов
+#
+set(CPACK_PACKAGE_VENDOR "${PROJECT_AUTHOR_NAME}")
+set(CPACK_PACKAGE_CONTACT "${PROJECT_AUTHOR_EMAIL}")
+
+
+# Минимальные настройки для формирования deb-пакета
 #
 set(CPACK_GENERATOR "DEB")
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${PROJECT_AUTHOR_NAME} <${PROJECT_AUTHOR_EMAIL}>")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_VENDOR} <${CPACK_PACKAGE_CONTACT}>")
 set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
      "${CMAKE_BINARY_DIR}/preinst"
@@ -91,5 +97,12 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
      "${CMAKE_BINARY_DIR}/prerm"
      "${CMAKE_BINARY_DIR}/postrm"
 )
+
+# Минимальные настройки для сборки rpm-пакета
+#
+set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE    "${CMAKE_BINARY_DIR}/preinst")
+set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE   "${CMAKE_BINARY_DIR}/postinst")
+set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE  "${CMAKE_BINARY_DIR}/prerm")
+set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_BINARY_DIR}/postrm")
 
 include(CPack)
