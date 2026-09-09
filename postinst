@@ -1,5 +1,0 @@
-#!/bin/sh
-set -eux
-
-systemctl daemon-reload || true
-systemctl --global enable custom_service.service || true

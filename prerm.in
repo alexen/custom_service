@@ -1,0 +1,52 @@
+#!/bin/sh
+
+set -eux
+
+stop_service_for_all_active_users() {
+  service_name_="$1"
+  active_users_=$(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}' | while read -r U; do
+      if getent passwd "$U" | cut -d: -f7 | grep -qf /etc/shells; then
+          echo "$U"
+      fi
+  done)
+  for each_user in $active_users_; do
+    if id "$each_user" >/dev/null 2>&1; then
+      systemctl --machine="${each_user}@" --user stop "$service_name_" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+disable_service() {
+  systemctl --global disable "$1" || true
+}
+
+SERVICE_NAME="@PROJECT_NAME@.service"
+ACTION="$1"
+
+# Остановка работающего сервиса нужна если:
+# - производится удаление (но не обновление) RPM-пакета;
+# - производится обновление или удаление DEB-пакета.
+#
+# Здесь параметр $ACTION означает::
+# - 0 - режим удаления RPM-пакета
+# - upgrade - режим обновления DEB-пакета
+# - remove, purge - режим удаления DEB-пакета
+if \
+  [ "$ACTION" = "0" ] || \
+  [ "$ACTION" = "upgrade" ] || \
+  [ "$ACTION" = "remove" ] ||
+  [ "$ACTION" = "purge" ]; then
+
+  stop_service_for_all_active_users "$SERVICE_NAME"
+
+  # Отключение сервиса нужно если:
+  # - производится удаление RPM-пакета;
+  # - производится удаление DEB-пакета.
+  if \
+    [ "$ACTION" = "0" ] || \
+    [ "$ACTION" = "remove" ] || \
+    [ "$ACTION" = "purge" ]; then
+
+    disable_service "$SERVICE_NAME"
+  fi
+fi

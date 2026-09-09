@@ -75,14 +75,21 @@ install(
 )
 
 
+configure_file("${CMAKE_CURRENT_LIST_DIR}/preinst.in"  "${CMAKE_BINARY_DIR}/preinst"  @ONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/postinst.in" "${CMAKE_BINARY_DIR}/postinst" @ONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/prerm.in"    "${CMAKE_BINARY_DIR}/prerm"    @ONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/postrm.in"   "${CMAKE_BINARY_DIR}/postrm"   @ONLY)
+
 # Минимальные настройки для формирования deb-пакета (пока только для Debian-систем)
 #
 set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${PROJECT_AUTHOR_NAME} <${PROJECT_AUTHOR_EMAIL}>")
 set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-     "${CMAKE_CURRENT_SOURCE_DIR}/postinst"
-     "${CMAKE_CURRENT_SOURCE_DIR}/prerm"
+     "${CMAKE_BINARY_DIR}/preinst"
+     "${CMAKE_BINARY_DIR}/postinst"
+     "${CMAKE_BINARY_DIR}/prerm"
+     "${CMAKE_BINARY_DIR}/postrm"
 )
 
 include(CPack)
