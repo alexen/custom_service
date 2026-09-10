@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <atomic>
+#include <random>
 
 #include <boost/log/trivial.hpp>
 #include <boost/exception/diagnostic_information.hpp>
@@ -328,6 +329,22 @@ void signalHandler( int signum )
      running = false;
 }
 
+std::uint16_t generateRandomPort()
+{
+     // Диапазон портов: [49152, 65535]
+     constexpr uint16_t MIN_USER_PORT = 49152;
+     constexpr uint16_t MAX_USER_PORT = 65535;
+
+     // Используем движок, инициализированный случайным значением
+     static std::mt19937 rng{ std::random_device{}() };
+
+     // Равномерное распределение в нужном диапазоне
+     return std::uniform_int_distribution< std::uint16_t >{
+          MIN_USER_PORT,
+          MAX_USER_PORT
+     }( rng );
+}
+
 
 int main( int argc, char** argv )
 {
@@ -337,7 +354,7 @@ int main( int argc, char** argv )
 
           setSignalsHandler( { SIGINT, SIGTERM, SIGQUIT }, signalHandler );
 
-          runServerOnPort( 8080 );
+          runServerOnPort( generateRandomPort() );
      }
      catch( ... )
      {
