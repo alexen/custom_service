@@ -1,44 +1,6 @@
 #!/bin/sh
 
 
-get_active_regular_users() {
-  for username in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}'); do
-    if getent passwd "$username" | cut -d: -f7 | grep -qf /etc/shells; then
-      echo "$username"
-    fi
-  done
-}
-
-
-silent_run_systemctl_user_cmd() {
-  username_="$1"
-  shift
-  systemctl --machine="${username_}@" --user "$@" >/dev/null 2>&1 || true
-}
-
-
-stop_service_for_all_active_users() {
-  service_name_="$1"
-  for each_user in $( get_active_regular_users ); do
-    silent_run_systemctl_user_cmd "${each_user}" stop "$service_name_"
-  done
-}
-
-
-start_service_for_all_active_users() {
-  service_name_="$1"
-  for each_user in $( get_active_regular_users ); do
-    silent_run_systemctl_user_cmd "${each_user}" daemon-reload
-    silent_run_systemctl_user_cmd "${each_user}" enable --now "$service_name_"
-  done
-}
-
-
-get_user_id() {
-  id -u "$1" 2>/dev/null
-}
-
-
 get_XDG_RUNTIME_DIR() {
   username_="$1"
   user_id_="$(get_user_id "$username_")"
@@ -93,4 +55,49 @@ get_DBUS_SESSION_BUS_ADDRESS() {
   fi
 
   echo "${DBUS_SESSION_BUS_ADDRESS%%,*}"
+}
+
+
+get_active_regular_users() {
+  for username in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}'); do
+    if getent passwd "$username" | cut -d: -f7 | grep -qf /etc/shells; then
+      echo "$username"
+    fi
+  done
+}
+
+
+silent_run_systemctl_user_cmd() {
+  username_="$1"
+  shift
+
+  XDG_RUNTIME_DIR="$( get_XDG_RUNTIME_DIR "$username_" )"
+  DBUS_SESSION_BUS_ADDRESS="$( get_DBUS_SESSION_BUS_ADDRESS "$username_" "$XDG_RUNTIME_DIR" )"
+
+  runuser -u "$username_" -- env \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+    DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    systemctl --machine="${username_}@" --user "$@" >/dev/null 2>&1 || true
+}
+
+
+stop_service_for_all_active_users() {
+  service_name_="$1"
+  for each_user in $( get_active_regular_users ); do
+    silent_run_systemctl_user_cmd "${each_user}" stop "$service_name_"
+  done
+}
+
+
+start_service_for_all_active_users() {
+  service_name_="$1"
+  for each_user in $( get_active_regular_users ); do
+    silent_run_systemctl_user_cmd "${each_user}" daemon-reload
+    silent_run_systemctl_user_cmd "${each_user}" enable --now "$service_name_"
+  done
+}
+
+
+get_user_id() {
+  id -u "$1" 2>/dev/null
 }
