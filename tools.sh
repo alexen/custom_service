@@ -54,7 +54,7 @@ get_DBUS_SESSION_BUS_ADDRESS() {
     fi
   fi
 
-  echo "${DBUS_SESSION_BUS_ADDRESS%%,*}"
+  echo "$DBUS_SESSION_BUS_ADDRESS"
 }
 
 
