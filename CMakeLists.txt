@@ -60,25 +60,26 @@ install(TARGETS custom_service
 
 # Правила формирования и установки unit-файла сервиса
 #
-set(SERVICE_UNIT_INSTALL_PREFIX "/usr/lib/systemd/user")
-set(SERVICE_UNIT_FILE_TEMPLATE custom_service.service.in)
 set(SERVICE_UNIT_OUTPUT_FILE "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.service")
 
 configure_file(
-     "${SERVICE_UNIT_FILE_TEMPLATE}"
+     "custom_service.service.in"
      "${SERVICE_UNIT_OUTPUT_FILE}"
      @ONLY
 )
 
 install(
      FILES "${SERVICE_UNIT_OUTPUT_FILE}"
-     DESTINATION "${SERVICE_UNIT_INSTALL_PREFIX}"
+     DESTINATION "/usr/lib/systemd/user"
      PERMISSIONS
           OWNER_READ OWNER_WRITE
           GROUP_READ
           WORLD_READ
 )
 
+# Встраиваем sh-файл с вспомогательными функциями в контрольные скрипты deb и rpm
+#
+file(READ "tools.sh" TOOLS_SH_CONTENT)
 
 configure_file("${CMAKE_CURRENT_LIST_DIR}/preinst.in"  "${CMAKE_BINARY_DIR}/preinst"  @ONLY)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/postinst.in" "${CMAKE_BINARY_DIR}/postinst" @ONLY)

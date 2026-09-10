@@ -4,20 +4,9 @@ set -eux
 
 POSTINST="========================================================================================="
 
-start_service_for_all_active_users() {
-  service_name_="$1"
-  active_users_=$(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}' | while read -r U; do
-      if getent passwd "$U" | cut -d: -f7 | grep -qf /etc/shells; then
-          echo "$U"
-      fi
-  done)
-  for each_user in $active_users_; do
-    if id "$each_user" >/dev/null 2>&1; then
-      systemctl --machine="${each_user}@" --user daemon-reload >/dev/null 2>&1 || true
-      systemctl --machine="${each_user}@" --user enable --now "$service_name_" >/dev/null 2>&1 || true
-    fi
-  done
-}
+
+@TOOLS_SH_CONTENT@
+
 
 SERVICE_NAME="@PROJECT_NAME@.service"
 
