@@ -63,7 +63,7 @@ install(TARGETS custom_service
 set(SERVICE_UNIT_OUTPUT_FILE "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.service")
 
 configure_file(
-     "custom_service.service.in"
+     "${CMAKE_CURRENT_LIST_DIR}/custom_service.service.in"
      "${SERVICE_UNIT_OUTPUT_FILE}"
      @ONLY
 )
@@ -78,8 +78,13 @@ install(
 )
 
 # Встраиваем sh-файл с вспомогательными функциями в контрольные скрипты deb и rpm
+# (при этом отмечаем внешний файл с функциями как часть проекта, чтобы CMake отслеживал
+# его состояние и обновлял результирующие (выходные) файлы при любом изменении содержимого)
 #
-file(READ "tools.sh" TOOLS_SH_CONTENT)
+set_property(DIRECTORY APPEND PROPERTY
+     CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/tools.sh"
+)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/tools.sh" TOOLS_SH_CONTENT)
 
 configure_file("${CMAKE_CURRENT_LIST_DIR}/preinst.in"  "${CMAKE_BINARY_DIR}/preinst"  @ONLY)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/postinst.in" "${CMAKE_BINARY_DIR}/postinst" @ONLY)
