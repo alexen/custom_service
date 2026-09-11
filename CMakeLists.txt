@@ -27,8 +27,26 @@ if(POLICY CMP0167)
      cmake_policy(SET CMP0167 OLD)
 endif()
 
-set(Boost_NO_BOOST_CMAKE ON)
-find_package(Boost COMPONENTS log REQUIRED)
+# Включаем FetchContent
+include(FetchContent)
+
+# Объявляем зависимость от супер-проекта Boost
+FetchContent_Declare(
+    Boost
+    URL ${CMAKE_CURRENT_LIST_DIR}/3rdparty/boost-1.85.0-cmake.tar.xz
+    URL_HASH SHA256=0a9cc56ceae46986f5f4d43fe0311d90cf6d2fa9028258a95cab49ffdacf92ad
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
+set(BOOST_ENABLE_CMAKE ON CACHE INTERNAL "")
+# Отключаем тесты адресно для Boost
+set(BOOST_STANDALONE OFF CACHE INTERNAL "")
+
+set(BOOST_BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
+set(BOOST_INCLUDE_LIBRARIES log CACHE INTERNAL "")
+
+# Загружаем Boost в дерево сборки
+FetchContent_MakeAvailable(Boost)
 find_package(Threads REQUIRED)
 
 
@@ -41,11 +59,6 @@ include(GNUInstallDirs)
 # Правила сборки и инсталляции основного бинарника проекта
 #
 add_executable(custom_service main.cpp)
-target_compile_definitions(
-     custom_service
-     PRIVATE
-          BOOST_LOG_DYN_LINK
-)
 target_link_libraries(
      custom_service
      PRIVATE
