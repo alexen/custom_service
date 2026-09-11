@@ -148,4 +148,19 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE   "${CMAKE_BINARY_DIR}/postinst")
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE  "${CMAKE_BINARY_DIR}/prerm")
 set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_BINARY_DIR}/postrm")
 
+# Зачищаем формирование списка зависимостей RPM-пакета
+set(CPACK_RPM_PACKAGE_AUTOREQ     OFF)
+set(CPACK_RPM_PACKAGE_AUTOREQPROV OFF) # Отключение стандартных зависимостей
+set(CPACK_RPM_DEBUGINFO_PACKAGE   OFF) # Отключение CPack debug
+set(CPACK_RPM_COMPRESSION_TYPE "gzip") # Убирает PayloadIsLzma
+set(CPACK_RPM_SPEC_MORE_DEFINE "%global debug_package %{nil}") # Убирает debug64
+# Жестко запрещаем rpmbuild запускать скрипт поиска отладочной информации
+set(CPACK_RPM_SPEC_INSTALL_POST "/bin/true")
+# Настраиваем регулярное выражение, чтобы RPM отфильтровал и выбросил любые упоминания debug
+set(CPACK_RPM_SPEC_MORE_DEFINE "
+%define __requires_exclude_from ^/usr/lib/debug/.*$
+%define __requires_exclude ^(debug64.*|.*/ld-linux-x86-64.so.2.debug)$
+%global debug_package %{nil}
+")
+
 include(CPack)
