@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -eux
+
+PREINST="=========================================================================================="
+
+
+@TOOLS_SH_CONTENT@
+
+
+SERVICE_NAME="@PROJECT_NAME@.service"
+
+stop_service_for_all_active_users "$SERVICE_NAME"

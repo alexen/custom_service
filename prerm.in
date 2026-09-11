@@ -1,0 +1,40 @@
+#!/bin/sh
+
+set -eux
+
+PRERM="============================================================================================"
+
+
+@TOOLS_SH_CONTENT@
+
+
+SERVICE_NAME="@PROJECT_NAME@.service"
+ACTION="$1"
+
+# Остановка работающего сервиса нужна если:
+# - производится удаление (но не обновление) RPM-пакета;
+# - производится обновление или удаление DEB-пакета.
+#
+# Здесь параметр $ACTION означает::
+# - 0 - режим удаления RPM-пакета
+# - upgrade - режим обновления DEB-пакета
+# - remove, purge - режим удаления DEB-пакета
+if \
+  [ "$ACTION" = "0" ] || \
+  [ "$ACTION" = "upgrade" ] || \
+  [ "$ACTION" = "remove" ] ||
+  [ "$ACTION" = "purge" ]; then
+
+  stop_service_for_all_active_users "$SERVICE_NAME"
+
+  # Отключение сервиса нужно если:
+  # - производится удаление RPM-пакета;
+  # - производится удаление DEB-пакета.
+  if \
+    [ "$ACTION" = "0" ] || \
+    [ "$ACTION" = "remove" ] || \
+    [ "$ACTION" = "purge" ]; then
+
+    systemctl --global disable "$SERVICE_NAME" || true
+  fi
+fi

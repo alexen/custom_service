@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -eux
+
+POSTINST="========================================================================================="
+
+
+@TOOLS_SH_CONTENT@
+
+
+SERVICE_NAME="@PROJECT_NAME@.service"
+
+systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl --global enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+
+start_service_for_all_active_users "$SERVICE_NAME"
