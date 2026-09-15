@@ -1,0 +1,10 @@
+# Минимальные настройки для формирования deb-пакета
+#
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_VENDOR} <${CPACK_PACKAGE_CONTACT}>")
+set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+     "${CMAKE_BINARY_DIR}/preinst"
+     "${CMAKE_BINARY_DIR}/postinst"
+     "${CMAKE_BINARY_DIR}/prerm"
+     "${CMAKE_BINARY_DIR}/postrm"
+)
