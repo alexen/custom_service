@@ -30,7 +30,6 @@ endif()
 # Включаем FetchContent
 include(FetchContent)
 
-# Объявляем зависимость от супер-проекта Boost
 FetchContent_Declare(
     Boost
     URL https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.xz
@@ -45,8 +44,19 @@ set(BOOST_STANDALONE OFF CACHE INTERNAL "")
 set(BOOST_BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
 set(BOOST_INCLUDE_LIBRARIES log CACHE INTERNAL "")
 
+# Сохраняем текущее значение флага
+set(OLD_CMAKE_WARN_DEPRECATED ${CMAKE_WARN_DEPRECATED})
+
+# Выключаем предупреждения об устаревании
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+
 # Загружаем Boost в дерево сборки
 FetchContent_MakeAvailable(Boost)
+
+# Возвращаем настройки обратно для вашего собственного кода
+set(CMAKE_WARN_DEPRECATED ${OLD_CMAKE_WARN_DEPRECATED} CACHE BOOL "" FORCE)
+
+
 find_package(Threads REQUIRED)
 
 
