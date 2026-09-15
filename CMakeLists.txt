@@ -171,7 +171,9 @@ set(CPACK_RPM_PACKAGE_REQUIRES    "")
 # 2. УРОВЕНЬ RPMBUILD: Тотальное подавление генераторов на всех дистрибутивах
 # ==============================================================================
 set(CPACK_RPM_SPEC_MORE_DEFINE "
-# --- Стандартный RPM (RHEL, CentOS, Rocky, Fedora, openSUSE) ---
+# ==============================================================================
+# ОБЩИЕ МАКРОСЫ (Безопасны для всех систем, включая РЕД ОС)
+# ==============================================================================
 %define _use_internal_dependency_generator 0
 %global _use_internal_dependency_generator 0
 %define __find_requires %{nil}
@@ -179,7 +181,7 @@ set(CPACK_RPM_SPEC_MORE_DEFINE "
 %define __find_provides %{nil}
 %global __find_provides %{nil}
 
-# Жесткая подмена путей к скриптам генерации (на случай, если %{nil} игнорируется)
+# Жесткая подмена путей к скриптам генерации
 %define __find_requires /bin/true
 %define __find_provides /bin/true
 
@@ -187,19 +189,30 @@ set(CPACK_RPM_SPEC_MORE_DEFINE "
 %define _missing_doc_files_terminate_build 0
 %define _unpackaged_files_terminate_build 0
 
-# --- Специфичные макросы для ALT Linux (Sisyphus, P8-P11) ---
-# Фильтруем абсолютно все зависимости (регулярное выражение /.* совпадает со всем)
+# --- Специфичные макросы для РЕД ОС / RHEL / Fedora / Mageia ---
+# Если это НЕ ALT Linux, используем фильтрацию регулярными выражениями (вырезаем всё)
+%if ! 0%{?altlinux}
+%define __requires_exclude .*
+%global __requires_exclude .*
+%define __provides_exclude .*
+%global __provides_exclude .*
+%define _requires_exceptions .*
+%define _provides_exceptions .*
+%endif
+
+# ==============================================================================
+# СПЕЦИФИЧНЫЕ МАКРОСЫ ДЛЯ ALT LINUX (Изолированы условием)
+# ==============================================================================
+%if 0%{?altlinux}
+# Фильтруем абсолютно все зависимости
 %define __find_requires_filter /.*
 %global __find_requires_filter /.*
 %define __find_provides_filter /.*
 %global __find_provides_filter /.*
-# Вносим все файлы и скрипты в черный список для проверки зависимостей
+# Вносим все файлы и скрипты в черный список для проверки
 %set_findreq_skiplist *
 %set_findprov_skiplist *
-
-# --- Специфичные макросы для Mageia / OpenMandriva ---
-%define _requires_exceptions .*
-%define _provides_exceptions .*
+%endif
 ")
 
 # ==============================================================================
