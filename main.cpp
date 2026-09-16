@@ -156,10 +156,6 @@ uid_t getTcpSocketUserId( std::uint16_t remotePort, __u32* targetInode = nullptr
                     auto kernelRowSport = ntohs( diagMsg->id.idiag_sport );
                     auto kernelRowDport = ntohs( diagMsg->id.idiag_dport );
                     auto kernelRowUid = diagMsg->idiag_uid;
-                    if( targetInode )
-                    {
-                         *targetInode = diagMsg->idiag_inode;
-                    }
 
                     inspectedRowsCount++;
 
@@ -178,6 +174,11 @@ uid_t getTcpSocketUserId( std::uint16_t remotePort, __u32* targetInode = nullptr
 
                     if( kernelRowSport == remotePort )
                     {
+                         if( targetInode )
+                         {
+                              *targetInode = diagMsg->idiag_inode;
+                         }
+
                          verifiedClientUid = kernelRowUid;
 
                          BOOST_LOG_TRIVIAL( trace ) << "           >>> TARGET CLIENT SOCKET DETECTED! <<<";
