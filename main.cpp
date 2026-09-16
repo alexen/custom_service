@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <atomic>
 #include <random>
+#include <filesystem>
+#include <fstream>
+#include <optional>
 
 #include <boost/log/trivial.hpp>
 #include <boost/exception/diagnostic_information.hpp>
@@ -72,7 +75,7 @@ void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t han
 
 
 // Функция запрашивает UID владельца TCP-сокета напрямую у ядра Linux через Netlink
-uid_t getTcpSocketUserId( std::uint16_t remotePort )
+uid_t getTcpSocketUserId( std::uint16_t remotePort, std::uint32_t* targetInode = nullptr )
 {
      BOOST_LOG_TRIVIAL( trace ) << "[TRACE] >>> STARTING BI-DIRECTIONAL NETLINK DIAGNOSTIC SCAN <<<";
      BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Incoming Client Port (Remote): " << remotePort;
@@ -153,6 +156,10 @@ uid_t getTcpSocketUserId( std::uint16_t remotePort )
                     auto kernelRowSport = ntohs( diagMsg->id.idiag_sport );
                     auto kernelRowDport = ntohs( diagMsg->id.idiag_dport );
                     auto kernelRowUid = diagMsg->idiag_uid;
+                    if( targetInode )
+                    {
+                         *targetInode = diagMsg->idiag_inode;
+                    }
 
                     inspectedRowsCount++;
 
@@ -191,13 +198,134 @@ uid_t getTcpSocketUserId( std::uint16_t remotePort )
 }
 
 
+inline bool isNumber( const std::string& s )
+{
+     return !s.empty() && std::all_of( s.begin(), s.end(), ::isdigit );
+}
+
+
+std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode )
+{
+     if( targetInode == 0 )
+     {
+          BOOST_LOG_TRIVIAL( trace ) << "[TRACE] FAILED: Target inode is 0";
+          return {};
+     }
+
+     /// Формируем паттерн системной ссылки, который мы ищем в дескрипторах сокетов
+     const std::string targetPattern = "socket:[" + std::to_string( targetInode ) + "]";
+     std::error_code ec;
+
+     BOOST_LOG_TRIVIAL( trace )
+          << "[TRACE] Starting /proc scan for socket pattern: "
+          << targetPattern;
+
+     /// Безопасно открываем корень виртуальной ФС /proc
+     auto procIterator = std::filesystem::directory_iterator( "/proc", ec );
+     if( ec )
+     {
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] ERROR: Failed to open /proc directory: " << ec.message();
+          return {};
+     }
+
+     int inspectedProcsCount = 0;
+
+     /// Обходим дерево /proc
+     for( auto&& procEntry: procIterator )
+     {
+          if( !procEntry.is_directory( ec ) || ec )
+          {
+               continue;
+          }
+
+          std::string pidStr = procEntry.path().filename().string();
+          if( !isNumber( pidStr ) )
+          {
+               continue;
+          }
+
+          ++inspectedProcsCount;
+
+          // Путь к дескрипторам файлов текущего процесса: /proc/[PID]/fd
+          std::filesystem::path fdPath = procEntry.path() / "fd";
+
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] -> Starting scan " << fdPath;
+
+          /// Открываем директорию fd текущего процесса.
+          /// skip_permission_denied автоматически пропускает чужие
+          /// /proc/[PID]/fd без генерации исключений.
+          auto fdIterator = std::filesystem::directory_iterator(
+               fdPath,
+               std::filesystem::directory_options::skip_permission_denied,
+               ec
+          );
+          if( ec )
+          {
+               /// Тихо пропускаем процессы, к дескрипторам которых нет доступа
+               continue;
+          }
+
+          bool processFound = false;
+
+          // Перебираем все открытые дескрипторы внутри /proc/[PID]/fd/
+          for( auto&& fdEntry: fdIterator )
+          {
+               if( fdEntry.is_symlink( ec ) && !ec )
+               {
+                    // Прямой системный вызов readlink() через абстракцию C++17
+                    std::filesystem::path linkTarget =
+                         std::filesystem::read_symlink( fdEntry, ec );
+
+                    BOOST_LOG_TRIVIAL( trace )
+                         << "[TRACE] ---> Compare: " << linkTarget.string() << " == " << targetPattern;
+
+                    if( !ec && linkTarget.string() == targetPattern )
+                    {
+                         processFound = true;
+                         break;
+                    }
+               }
+          }
+
+          /// Если сокет найден, извлекаем имя этого процесса
+          if( processFound )
+          {
+               std::string processName;
+               // Путь к файлу comm, содержащему чистое имя процесса
+               std::filesystem::path commPath = procEntry.path() / "comm";
+               std::ifstream commFile( commPath );
+               if( commFile.is_open() )
+               {
+                    std::getline( commFile, processName );
+               }
+
+               BOOST_LOG_TRIVIAL( trace )
+                    << "[TRACE] Success matching proc row after inspecting "
+                    << inspectedProcsCount << " processes.";
+
+               return processName;
+          }
+     }
+
+     return {};
+}
+
+
 bool isConnectionAllowed( const std::uint16_t remotePort )
 {
-     const auto clientUid = getTcpSocketUserId( remotePort );
+     auto targetInode = static_cast< std::uint32_t >( -1 );
+     const auto clientUid = getTcpSocketUserId( remotePort, &targetInode );
      if( clientUid == static_cast< uid_t >( -1 ) )
      {
           BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Netlink query failed to extract UID!";
           return false;
+     }
+
+     if( targetInode != static_cast< std::uint32_t >( -1 ) )
+     {
+          BOOST_LOG_TRIVIAL( info ) << "Proc name: " << getProcessBySocketInode( targetInode ).value_or( "[unknown]" );
      }
 
      const auto currentUid = getuid();
