@@ -71,6 +71,14 @@ include(GNUInstallDirs)
 # Правила сборки и инсталляции основного бинарника проекта
 #
 add_executable(custom_service main.cpp)
+target_compile_options(
+     custom_service
+     PRIVATE
+          -Wall
+          -Wextra
+          -Werror
+          -pedantic
+)
 target_link_libraries(
      custom_service
      PRIVATE
