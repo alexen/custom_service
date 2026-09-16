@@ -250,9 +250,6 @@ std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode 
           // Путь к дескрипторам файлов текущего процесса: /proc/[PID]/fd
           std::filesystem::path fdPath = procEntry.path() / "fd";
 
-          BOOST_LOG_TRIVIAL( trace )
-               << "[TRACE] -> Starting scan " << fdPath;
-
           /// Открываем директорию fd текущего процесса.
           /// skip_permission_denied автоматически пропускает чужие
           /// /proc/[PID]/fd без генерации исключений.
@@ -277,9 +274,6 @@ std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode 
                     // Прямой системный вызов readlink() через абстракцию C++17
                     std::filesystem::path linkTarget =
                          std::filesystem::read_symlink( fdEntry, ec );
-
-                    BOOST_LOG_TRIVIAL( trace )
-                         << "[TRACE] ---> Compare: " << linkTarget.string() << " == " << targetPattern;
 
                     if( !ec && linkTarget.string() == targetPattern )
                     {
@@ -325,7 +319,9 @@ bool isConnectionAllowed( const std::uint16_t remotePort )
 
      if( targetInode != static_cast< std::uint32_t >( -1 ) )
      {
-          BOOST_LOG_TRIVIAL( info ) << "Proc name: " << getProcessBySocketInode( targetInode ).value_or( "[unknown]" );
+          BOOST_LOG_TRIVIAL( info )
+               << "[TRACE] Client process name: "
+               << getProcessBySocketInode( targetInode ).value_or( "[unknown]" );
      }
 
      const auto currentUid = getuid();
