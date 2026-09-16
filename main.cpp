@@ -347,7 +347,8 @@ std::atomic_bool running = true;
 
 void runServerOnPort( std::uint16_t port )
 {
-     BOOST_LOG_TRIVIAL( info ) << "Start listening port " << port;
+     BOOST_LOG_TRIVIAL( info ) << "Start listening port " << port
+          << " (hex: " << std::hex << std::setw( 4 ) << std::setfill( '0' ) << port << ")";
 
      // 1. Создаём сокет (IPv4, TCP)
      const int server_fd = socket( AF_INET, SOCK_STREAM, 0 );
@@ -481,11 +482,18 @@ int main( int argc, char** argv )
 {
      try
      {
+          std::uint16_t port = generateRandomPort();
+
+          if( argc > 1 )
+          {
+               port = std::stoi( argv [ 1 ] );
+          }
+
           reportAppStarting( argc, argv );
 
           setSignalsHandler( { SIGINT, SIGTERM, SIGQUIT }, signalHandler );
 
-          runServerOnPort( generateRandomPort() );
+          runServerOnPort( port );
      }
      catch( ... )
      {
