@@ -168,9 +168,6 @@ uid_t getTcpSocketUserId( std::uint16_t remotePort, __u32* targetInode = nullptr
                     if( kernelRowSport == remotePort
                         || kernelRowDport == remotePort )
                     {
-                         verifiedClientUid = kernelRowUid;
-                         scanComplete = true;
-
                          BOOST_LOG_TRIVIAL( trace )
                               << "        -> [ROW MATCH #" << inspectedRowsCount
                               << "]"
