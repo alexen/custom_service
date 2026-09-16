@@ -157,7 +157,7 @@ uid_t getTcpSocketUserId( std::uint16_t remotePort, __u32* targetInode = nullptr
                     auto kernelRowDport = ntohs( diagMsg->id.idiag_dport );
                     auto kernelRowUid = diagMsg->idiag_uid;
 
-                    inspectedRowsCount++;
+                    ++inspectedRowsCount;
 
                     /// Этот блок if оставляем здесь только для красивого
                     /// и информативного TRACE-вывода
