@@ -75,7 +75,7 @@ void setSignalsHandler( std::initializer_list< int > signums, __sighandler_t han
 
 
 // Функция запрашивает UID владельца TCP-сокета напрямую у ядра Linux через Netlink
-uid_t getTcpSocketUserId( std::uint16_t remotePort, std::uint32_t* targetInode = nullptr )
+uid_t getTcpSocketUserId( std::uint16_t remotePort, __u32* targetInode = nullptr )
 {
      BOOST_LOG_TRIVIAL( trace ) << "[TRACE] >>> STARTING BI-DIRECTIONAL NETLINK DIAGNOSTIC SCAN <<<";
      BOOST_LOG_TRIVIAL( trace ) << "[TRACE] Incoming Client Port (Remote): " << remotePort;
@@ -204,7 +204,14 @@ inline bool isNumber( const std::string& s )
 }
 
 
-std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode )
+struct ProcessInfo
+{
+     pid_t pid;
+     std::string name;
+};
+
+
+std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t targetInode )
 {
      if( targetInode == 0 )
      {
@@ -265,6 +272,7 @@ std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode 
           }
 
           bool processFound = false;
+          ProcessInfo processInfo {};
 
           // Перебираем все открытые дескрипторы внутри /proc/[PID]/fd/
           for( auto&& fdEntry: fdIterator )
@@ -277,6 +285,7 @@ std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode 
 
                     if( !ec && linkTarget.string() == targetPattern )
                     {
+                         processInfo.pid = std::stoi( pidStr );
                          processFound = true;
                          break;
                     }
@@ -286,20 +295,19 @@ std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode 
           /// Если сокет найден, извлекаем имя этого процесса
           if( processFound )
           {
-               std::string processName;
                // Путь к файлу comm, содержащему чистое имя процесса
                std::filesystem::path commPath = procEntry.path() / "comm";
                std::ifstream commFile( commPath );
                if( commFile.is_open() )
                {
-                    std::getline( commFile, processName );
+                    std::getline( commFile, processInfo.name );
                }
 
                BOOST_LOG_TRIVIAL( trace )
                     << "[TRACE] Success matching proc row after inspecting "
                     << inspectedProcsCount << " processes.";
 
-               return processName;
+               return processInfo;
           }
      }
 
@@ -309,7 +317,7 @@ std::optional< std::string > getProcessBySocketInode( std::uint32_t targetInode 
 
 bool isConnectionAllowed( const std::uint16_t remotePort )
 {
-     auto targetInode = static_cast< std::uint32_t >( -1 );
+     __u32 targetInode {};
      const auto clientUid = getTcpSocketUserId( remotePort, &targetInode );
      if( clientUid == static_cast< uid_t >( -1 ) )
      {
@@ -317,11 +325,10 @@ bool isConnectionAllowed( const std::uint16_t remotePort )
           return false;
      }
 
-     if( targetInode != static_cast< std::uint32_t >( -1 ) )
-     {
-          BOOST_LOG_TRIVIAL( info )
-               << "[TRACE] Client process name: "
-               << getProcessBySocketInode( targetInode ).value_or( "[unknown]" );
+     if( auto&& procInfo = getProcessBySocketInode( targetInode ) ){
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] Client PID: " << procInfo->pid
+               << " (" << procInfo->name << ")";
      }
 
      const auto currentUid = getuid();
