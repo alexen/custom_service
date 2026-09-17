@@ -12,13 +12,13 @@
 #include <cstdint>
 #include <atomic>
 #include <random>
-#include <filesystem>
-#include <fstream>
-#include <optional>
 
 #include <boost/log/trivial.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/throw_exception.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/optional/optional.hpp>
 
 
 using namespace std::string_literals;
@@ -209,7 +209,7 @@ struct ProcessInfo
 };
 
 
-std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t targetInode )
+boost::optional<ProcessInfo> getProcessBySocketInode(const std::uint32_t targetInode)
 {
      if( targetInode == 0 )
      {
@@ -219,14 +219,17 @@ std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t target
 
      /// Формируем паттерн системной ссылки, который мы ищем в дескрипторах сокетов
      const std::string targetPattern = "socket:[" + std::to_string( targetInode ) + "]";
-     std::error_code ec;
+     boost::system::error_code ec;
 
      BOOST_LOG_TRIVIAL( trace )
           << "[TRACE] Starting /proc scan for socket pattern: "
           << targetPattern;
 
-     /// Безопасно открываем корень виртуальной ФС /proc
-     auto procIterator = std::filesystem::directory_iterator( "/proc", ec );
+     auto procIterator = boost::filesystem::directory_iterator(
+          "/proc",
+          boost::filesystem::directory_options::skip_permission_denied,
+          ec
+          );
      if( ec )
      {
           BOOST_LOG_TRIVIAL( trace )
@@ -234,17 +237,21 @@ std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t target
           return {};
      }
 
+     /// Небольшая статистика поиска просто для вывода в лог
      int inspectedProcsCount = 0;
 
      /// Обходим дерево /proc
      for( auto&& procEntry: procIterator )
      {
-          if( !procEntry.is_directory( ec ) || ec )
+          /// ВАЖНО: Используем symlink_status вместо обычного status.
+          /// Это предотвращает прохождение (follow) по ссылкам и сразу возвращает тип элемента в /proc
+          const auto procStatus = procEntry.symlink_status( ec );
+          if( ec || !boost::filesystem::is_directory( procStatus ) )
           {
                continue;
           }
 
-          std::string pidStr = procEntry.path().filename().string();
+          const auto pidStr = procEntry.path().filename().string();
           if( !isNumber( pidStr ) )
           {
                continue;
@@ -252,17 +259,19 @@ std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t target
 
           ++inspectedProcsCount;
 
-          // Путь к дескрипторам файлов текущего процесса: /proc/[PID]/fd
-          std::filesystem::path fdPath = procEntry.path() / "fd";
+          /// Путь к дескрипторам файлов текущего процесса: /proc/[PID]/fd
+          const auto procFdPath = procEntry.path() / "fd";
+
+          BOOST_LOG_TRIVIAL( trace )
+               << "[TRACE] -> Searching " << procFdPath;
 
           /// Открываем директорию fd текущего процесса.
-          /// skip_permission_denied автоматически пропускает чужие
-          /// /proc/[PID]/fd без генерации исключений.
-          auto fdIterator = std::filesystem::directory_iterator(
-               fdPath,
-               std::filesystem::directory_options::skip_permission_denied,
+          /// Добавляем skip_permission_denied, чтобы не падать на процессах других пользователей.
+          auto procFdIterator = boost::filesystem::directory_iterator(
+               procFdPath,
+               boost::filesystem::directory_options::skip_permission_denied,
                ec
-          );
+               );
           if( ec )
           {
                /// Тихо пропускаем процессы, к дескрипторам которых нет доступа
@@ -272,14 +281,19 @@ std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t target
           bool processFound = false;
           ProcessInfo processInfo {};
 
-          // Перебираем все открытые дескрипторы внутри /proc/[PID]/fd/
-          for( auto&& fdEntry: fdIterator )
+          /// Перебираем все открытые дескрипторы внутри /proc/[PID]/fd/
+          for( auto&& fdEntry: procFdIterator )
           {
-               if( fdEntry.is_symlink( ec ) && !ec )
+               /// Здесь также строго проверяем статус ссылки БЕЗ follow_symlinks эффекта
+               const auto fdStatus = fdEntry.symlink_status( ec );
+               if( !ec && boost::filesystem::is_symlink( fdStatus ) )
                {
-                    // Прямой системный вызов readlink() через абстракцию C++17
-                    std::filesystem::path linkTarget =
-                         std::filesystem::read_symlink( fdEntry, ec );
+                    /// Читаем саму ссылку напрямую через системный вызов ядра
+                    const auto linkTarget =
+                         boost::filesystem::read_symlink( fdEntry.path(), ec );
+
+                    BOOST_LOG_TRIVIAL( trace )
+                         << "[TRACE]    " << fdEntry << " => " << linkTarget;
 
                     if( !ec && linkTarget.string() == targetPattern )
                     {
@@ -294,8 +308,8 @@ std::optional< ProcessInfo > getProcessBySocketInode( const std::uint32_t target
           if( processFound )
           {
                // Путь к файлу comm, содержащему чистое имя процесса
-               std::filesystem::path commPath = procEntry.path() / "comm";
-               std::ifstream commFile( commPath );
+               boost::filesystem::path commPath = procEntry.path() / "comm";
+               boost::filesystem::ifstream commFile{ commPath };
                if( commFile.is_open() )
                {
                     std::getline( commFile, processInfo.name );
