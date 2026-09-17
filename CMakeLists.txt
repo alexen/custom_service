@@ -42,7 +42,7 @@ set(BOOST_ENABLE_CMAKE ON CACHE INTERNAL "")
 set(BOOST_STANDALONE OFF CACHE INTERNAL "")
 
 set(BOOST_BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
-set(BOOST_INCLUDE_LIBRARIES log CACHE INTERNAL "")
+set(BOOST_INCLUDE_LIBRARIES log filesystem CACHE INTERNAL "")
 
 # Сохраняем текущее значение флага
 set(OLD_CMAKE_WARN_DEPRECATED ${CMAKE_WARN_DEPRECATED})
@@ -83,6 +83,7 @@ target_link_libraries(
      custom_service
      PRIVATE
           Boost::log
+          Boost::filesystem
           Threads::Threads
 )
 install(TARGETS custom_service
