@@ -91,6 +91,22 @@ install(TARGETS custom_service
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+set(SHELL_START_SCRIPT_NAME "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.sh")
+configure_file(
+     starter.sh.in
+     ${SHELL_START_SCRIPT_NAME}
+     @ONLY
+     NEWLINE_STYLE
+          UNIX
+)
+# Установка стартового скрипта с правами для чтения и запуска (r-x/r-x/r-x)
+install(
+     FILES "${SHELL_START_SCRIPT_NAME}"
+     TYPE BIN
+     PERMISSIONS
+          OWNER_READ    GROUP_READ    WORLD_READ
+          OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE
+)
 
 # Правила формирования и установки unit-файла сервиса
 #
