@@ -2,6 +2,7 @@
 Description=@PROJECT_DESCRIPTION@
 StartLimitBurst=5
 ConditionPathIsDirectory=/home/%u
+After=basic.target
 
 [Service]
 Type=simple
@@ -15,4 +16,4 @@ KillSignal=SIGINT
 TimeoutStopSec=2
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target

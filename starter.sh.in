@@ -1,3 +1,22 @@
 #!/bin/bash
 
+# Цикл ожидания графического сервера (максимум 15 секунд)
+for i in {1..15}; do
+  # Проверяем, доступны ли переменные для X11 или Wayland
+  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+    break
+  fi
+  # Попытка подтянуть переменные из активного сессионного окружения dbus/systemd
+  if command -v systemctl &>/dev/null; then
+    eval $(systemctl --user show-environment | grep -E '^(DISPLAY|WAYLAND_DISPLAY|XAUTHORITY)=')
+  fi
+  sleep 1
+done
+
+# Если графика так и не появилась, завершаем работу с ошибкой (systemd попробует еще раз через RestartSec)
+if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+  echo "Ошибка: Графический сервер (X11/Wayland) не обнаружен." >&2
+  exit 1
+fi
+
 @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ "$@"
