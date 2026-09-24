@@ -1,28 +1,21 @@
 #!/bin/bash
 
-# Цикл ожидания графического сервера (максимум 15 секунд)
-for i in {1..15}; do
-  echo "Waiting for X11/Wayland server starting..."
+WAITING_SEC=10
+
+for i in {1..$WAITING_SEC}; do
+  echo "Waiting X11 server starting..."
   if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
-    echo "Waiting for X11/Wayland server starting... OK"
     break
-  fi
-  echo "Waiting for X11/Wayland server starting... MISSING"
-  echo "Let's try get envs from active session environment and repeat checking..."
-  if command -v systemctl &>/dev/null; then
-    eval $(systemctl --user show-environment | grep -E '^(DISPLAY|WAYLAND_DISPLAY|XAUTHORITY)=')
   fi
   sleep 1
 done
 
-# Если графика так и не появилась, завершаем работу с ошибкой (systemd попробует еще раз через RestartSec)
 if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
-  echo "ERROR: No X11/Wayland server found!" >&2
+  echo "ERROR: No X11 server found!" >&2
   exit 1
 fi
 
-echo "Environment: DISPLAY=$DISPLAY"
-echo "Environment: WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
-echo "Environment: XAUTHORITY=$XAUTHORITY"
+echo "DISPLAY: $DISPLAY"
+echo "WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
 
 @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@ "$@"
