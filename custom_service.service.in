@@ -2,7 +2,7 @@
 Description=@PROJECT_DESCRIPTION@
 StartLimitBurst=5
 ConditionPathIsDirectory=/home/%u
-After=basic.target
+After=default.target
 
 [Service]
 Type=simple
