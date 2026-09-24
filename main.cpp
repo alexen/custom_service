@@ -496,9 +496,16 @@ int main( int argc, char** argv )
      {
           std::uint16_t port = generateRandomPort();
 
-          if( argc > 1 )
+          for( auto i = 1; i < argc; ++i )
           {
-               port = std::stoi( argv [ 1 ] );
+               if( std::strcmp( argv[ i ], "--port" ) == 0 )
+               {
+                    if( (i + 1) < argc )
+                    {
+                         port = std::stoi( argv[ i+1 ] );
+                         break;
+                    }
+               }
           }
 
           reportAppStarting( argc, argv );
