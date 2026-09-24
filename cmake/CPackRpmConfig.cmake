@@ -1,3 +1,5 @@
+set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+
 # Минимальные настройки для сборки rpm-пакета
 #
 set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE    "${CMAKE_BINARY_DIR}/preinst")
