@@ -1,8 +1,6 @@
 #!/bin/bash
 
-WAITING_SEC=10
-
-for i in {1..$WAITING_SEC}; do
+for i in {1..10}; do
   echo "Waiting X11 server starting..."
   if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
     break
