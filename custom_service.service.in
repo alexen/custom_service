@@ -1,6 +1,7 @@
 [Unit]
 Description=@PROJECT_DESCRIPTION@
 StartLimitBurst=5
+StartLimitIntervalSec=300
 ConditionPathIsDirectory=/home/%u
 After=default.target
 
