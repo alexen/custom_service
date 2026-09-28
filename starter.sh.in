@@ -8,7 +8,7 @@ SESSION_ID=$(loginctl list-sessions --no-legend | grep -w "$USER" | awk '{print 
 
 if [ -z "$SESSION_ID" ]; then
   echo "The graphical session was not found (the user is not logged in)"
-  exit 1
+  exit 201
 fi
 
 # 2. Проверяем тип сессии (x11 или wayland)
@@ -21,7 +21,7 @@ if [[ "$SESSION_TYPE" =~ ^(x11|wayland)$ ]] && [ "$SESSION_STATE" = "active" ]; 
   echo "The graphical session ($SESSION_TYPE) is active and displayed on the screen."
 else
   echo "The graphical session is not active (type: $SESSION_TYPE)"
-  exit 1
+  exit 202
 fi
 
 # Похоже, что графическая сессия активна. Дожидаемся появления переменных DISPLAY/WAYLAND_display
@@ -31,7 +31,7 @@ if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
   SESSION_DISPLAY="$(loginctl show-session "$SESSION_ID" -p Display --value)"
   if [ -z "$SESSION_DISPLAY" ]; then
     echo "Error retrieving the value of the DISPLAY variable, exit!" >&2
-    exit 1
+    exit 203
   fi
   export DISPLAY="$SESSION_DISPLAY"
 fi
